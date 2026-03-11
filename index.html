@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Penjurian GTK Dedikatif 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Libraries for Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+     const firebaseConfig = {
+  apiKey: "AIzaSyBczvqqHvNfql3MQrFvjZu_Uhq68dsLhps",
+  authDomain: "penjurian-dedikatif-kab-pkl-26.firebaseapp.com",
+  projectId: "penjurian-dedikatif-kab-pkl-26",
+  storageBucket: "penjurian-dedikatif-kab-pkl-26.firebasestorage.app",
+  messagingSenderId: "260469033621",
+  appId: "1:260469033621:web:9ee4c7716a7f4d5b85a99c",
+  measurementId: "G-PMPCXZ4ZV"
+};
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gtk-2026-prod';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app); 
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.fbImports = { doc, setDoc, getDoc, collection, query, onSnapshot, deleteDoc, signOut };
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) { 
+                console.error("Auth Error:", error); 
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            window.currentUserAuth = user;
+            if (user) {
+                startSync();
+            }
+        });
+
+        function startSync() {
+            if (!window.currentUserAuth) return;
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+            onSnapshot(colRef, (snap) => {
+                window.dbNilai = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+                if (typeof window.refreshUI === 'function') {
+                    window.refreshUI();
+                }
+            }, (err) => {
+                console.error("Firestore Sync Error:", err);
+            });
+        }
+
+        initAuth();
+    </script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #0747a6;
+            --bg: #f4f5f7;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --text-main: #172b4d;
+            --text-muted: #5e6c84;
+            --border: #e5e7eb;
+            --input-bg: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --primary: #4c9aff;
+            --bg: #091e42;
+            --sidebar-bg: #1d2125;
+            --card-bg: #22272b;
+            --text-main: #b6c2cf;
+            --text-muted: #9fadbc;
+            --border: #333c44;
+            --input-bg: #2c333a;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at top left, #0747a6, #002e6e); padding: 20px; }
+        .login-box { width: 100%; max-width: 1000px; background: white; border-radius: 32px; display: flex; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.4); color: #172b4d; }
+        .login-left { flex: 1.2; padding: 50px; border-right: 1px solid #f0f0f0; }
+        .login-right { flex: 0.8; padding: 50px; background: #fafbfc; }
+
+        .sidebar { min-height: 100vh; background: var(--sidebar-bg); border-right: 1px solid var(--border); position: sticky; top: 0; z-index: 100; transition: background 0.3s; }
+        .nav-link { color: var(--text-main); padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-radius: 12px; margin: 4px 16px; font-weight: 600; text-decoration: none !important; cursor: pointer; opacity: 0.8; transition: all 0.2s; }
+        .nav-link:hover { background-color: rgba(7, 71, 166, 0.1); opacity: 1; }
+        .nav-link.active { background-color: var(--primary); color: white; opacity: 1; box-shadow: 0 4px 12px rgba(7, 71, 166, 0.2); }
+        
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); background: var(--card-bg); margin-bottom: 24px; color: var(--text-main); transition: background 0.3s; }
+        .table { color: inherit; }
+        .form-select, .form-control { background-color: var(--input-bg); color: var(--text-main); border-color: var(--border); }
+
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(5px); }
+        
+        body.is-admin .juri-only { display: none !important; }
+        body:not(.is-admin) .admin-only { display: none !important; }
+
+        .sticky-bottom-bar { position: sticky; bottom: 0; background: var(--card-bg); border-top: 3px solid var(--primary); padding: 15px 30px; border-radius: 20px 20px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,0.1); z-index: 1000; }
+
+        .rank-badge { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+        .rank-1 { background: #ffab00; color: white; }
+        .rank-2 { background: #97a0af; color: white; }
+        .rank-3 { background: #82491e; color: white; }
+
+        .theme-toggle { margin: 20px 16px; padding: 10px; border-radius: 12px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; }
+        
+        .criteria-list { font-size: 0.82rem; color: var(--text-muted); list-style-type: none; padding-left: 0; margin-top: 10px; line-height: 1.4; }
+        .criteria-list li { margin-bottom: 6px; display: flex; gap: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 4px; }
+        .criteria-list li:last-child { border-bottom: none; }
+        .criteria-list li::before { content: attr(data-num); font-weight: 700; min-width: 20px; color: var(--primary); }
+        
+        .sub-letter { color: var(--primary); font-weight: 700; margin-right: 8px; font-size: 1.1rem; }
+        .group-header { background-color: rgba(7, 71, 166, 0.08); font-weight: 800; color: var(--primary); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body id="main-body" data-theme="light">
+
+<div id="loading" class="loading-overlay">
+    <div class="text-center text-white">
+        <div class="spinner-grow text-primary mb-3"></div>
+        <h5 class="fw-bold">Sedang Memproses...</h5>
+    </div>
+</div>
+
+<!-- Login Section -->
+<div id="section-login" class="login-page">
+    <div class="login-box">
+        <div class="login-left">
+            <div class="mb-5">
+                <h1 class="fw-bold text-primary mb-1">GTK Dedikatif 2026</h1>
+                <p class="text-muted">Instrumen Penjurian Peserta Terbaik</p>
+            </div>
+            
+            <h4 class="fw-bold mb-3">Panel Juri</h4>
+            <form id="juri-login-form" onsubmit="login(event, 'juri')">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Pilih Kategori Tugas</label>
+                    <select id="login-kategori" class="form-select form-select-lg" required>
+                        <option value="" disabled selected>Silahkan Pilih Kategori Anda</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">Password Juri</label>
+                    <input type="password" id="juri-password" class="form-control form-control-lg" placeholder="Password Juri" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm">Masuk Sebagai Juri</button>
+            </form>
+        </div>
+        
+        <div class="login-right">
+            <div class="text-center mb-4">
+                <div class="bg-primary text-white rounded-circle d-inline-flex p-3 mb-3">
+                    <i data-lucide="shield-check" size="32"></i>
+                </div>
+                <h4 class="fw-bold">Akses Admin</h4>
+            </div>
+            <form id="admin-login-form" onsubmit="login(event, 'admin')">
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">Password Admin</label>
+                    <input type="password" id="admin-password" class="form-control form-control-lg" placeholder="Admin Password" required>
+                </div>
+                <button type="submit" class="btn btn-outline-dark btn-lg w-100 fw-bold">Monitoring Admin</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- App Wrapper -->
+<div id="app-wrapper" class="container-fluid p-0" style="display: none;">
+    <div class="row g-0">
+        <div class="col-md-3 col-lg-2 sidebar">
+            <div class="p-4 border-bottom mb-2">
+                <h5 class="fw-bold text-primary mb-0">GTK 2026</h5>
+                <span id="role-display" class="badge bg-light text-dark border mt-2"></span>
+            </div>
+
+            <div class="theme-toggle">
+                <span class="small fw-bold opacity-75">Mode Tema</span>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="themeSwitch" onchange="toggleTheme()">
+                </div>
+            </div>
+
+            <nav>
+                <a id="nav-dashboard" class="nav-link active" onclick="switchSection('dashboard')"><i data-lucide="home"></i> Dashboard</a>
+                <a id="nav-penilaian" class="nav-link juri-only" onclick="switchSection('penilaian')"><i data-lucide="edit-3"></i> Penilaian</a>
+                <a id="nav-admin" class="nav-link admin-only" onclick="switchSection('admin')"><i data-lucide="bar-chart-3"></i> Monitoring</a>
+                <a id="nav-ranking" class="nav-link" onclick="switchSection('ranking')"><i data-lucide="award"></i> Peringkat</a>
+                <hr class="mx-3 opacity-25">
+                <a class="nav-link text-danger" onclick="logout()"><i data-lucide="power"></i> Keluar</a>
+            </nav>
+        </div>
+
+        <div class="col-md-9 col-lg-10 p-4">
+            <div id="section-dashboard" class="app-section">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold">Dashboard Peserta</h3>
+                    <div id="active-cat-pill" class="badge bg-primary px-3 py-2 fs-6"></div>
+                </div>
+                <div class="card p-4">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr><th>Nama & Instansi</th><th>Berkas</th><th class="text-center">J1</th><th class="text-center">J2</th><th class="text-center">J3</th><th class="text-end">Aksi</th></tr>
+                            </thead>
+                            <tbody id="dash-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="section-penilaian" class="app-section" style="display:none;">
+                <div class="card bg-primary text-white p-4 mb-4 border-0">
+                    <div class="row align-items-center">
+                        <div class="col-md-7">
+                            <h4 class="fw-bold mb-1">Instrumen Penilaian</h4>
+                            <p class="mb-0 opacity-75 small">Evaluasi secara komprehensif berdasarkan kriteria di bawah ini.</p>
+                        </div>
+                        <div class="col-md-5">
+                            <select id="pilih-peserta" class="form-select" onchange="loadForm()">
+                                <option value="">-- Pilih Peserta --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="form-area" style="display:none;">
+                    <div class="card shadow-sm border-0 overflow-hidden mb-4">
+                        <table class="table mb-0 align-middle">
+                            <thead class="bg-light">
+                                <tr><th>Aspek / Indikator & Kriteria Detail</th><th width="80" class="text-center">Bobot</th><th width="150" class="text-center">Skor (1-4)</th><th width="100" class="text-end">Nilai</th></tr>
+                            </thead>
+                            <tbody id="form-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="sticky-bottom-bar d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-bold">TOTAL NILAI AKHIR</span>
+                            <h1 class="fw-bold text-primary mb-0" id="grand-total">0.00</h1>
+                        </div>
+                        <button class="btn btn-primary btn-lg px-5 rounded-pill fw-bold" onclick="saveNilai()">Simpan Penilaian</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="section-admin" class="app-section admin-only" style="display:none;">
+                 <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold m-0">Monitoring Seluruh Nilai</h3>
+                    <button class="btn btn-success d-flex align-items-center gap-2" onclick="exportMonitoringExcel()">
+                        <i data-lucide="file-spreadsheet"></i> Export Excel
+                    </button>
+                 </div>
+                 <div class="card p-4">
+                    <table class="table table-hover align-middle">
+                        <thead><tr><th>Kategori</th><th>Peserta</th><th>Juri</th><th>Total</th><th class="text-end">Aksi</th></tr></thead>
+                        <tbody id="admin-table"></tbody>
+                    </table>
+                 </div>
+            </div>
+
+            <div id="section-ranking" class="app-section" style="display:none;">
+                 <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold">Peringkat 10 Terbaik</h3>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="admin-only">
+                            <select id="rank-filter-kat" class="form-select w-auto" onchange="initRanking()"></select>
+                        </div>
+                        <button class="btn btn-success d-flex align-items-center gap-2 admin-only" onclick="exportRankingExcel()">
+                            <i data-lucide="file-spreadsheet"></i> Excel
+                        </button>
+                        <button class="btn btn-danger d-flex align-items-center gap-2 admin-only" onclick="exportRankingPDF()">
+                            <i data-lucide="printer"></i> PDF
+                        </button>
+                        <div class="juri-only">
+                            <span id="rank-cat-badge" class="badge bg-light text-primary border p-2"></span>
+                        </div>
+                    </div>
+                 </div>
+
+                 <div class="card p-0 overflow-hidden">
+                    <table class="table table-hover align-middle mb-0" id="table-ranking-content">
+                        <thead class="bg-dark text-white">
+                            <tr><th class="ps-4" width="80">Pos</th><th>Nama & Instansi</th><th class="text-center">J1</th><th class="text-center">J2</th><th class="text-center">J3</th><th class="text-center">Rata-Rata</th></tr>
+                        </thead>
+                        <tbody id="rank-table"></tbody>
+                    </table>
+                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const KATEGORI_LIST = [
+        "Dedikatif Guru TK", "Dedikatif Pendidik PAUD (KB/TPA/SPS)", "Dedikatif Guru SD",
+        "Dedikatif Guru SMP", "Dedikatif Kepala TK", "Dedikatif Kepala Satuan PAUD (KB/TPA/SPS)",
+        "Dedikatif Kepala SD", "Dedikatif Kepala SMP", "Dedikatif Pengawas (TK/SD/SMP)"
+    ];
+
+    const PESERTA = [];
+    KATEGORI_LIST.forEach((k, kIdx) => {
+        for(let i=1; i<=10; i++) {
+            PESERTA.push({ id: (kIdx + 1) * 100 + i, nama: `Peserta ${k} ${i}`, instansi: `Instansi Asal ${i}`, kategori: k });
+        }
+    });
+
+    const RUBRIK_CONFIG = [
+        { type: 'header', text: '1. Orisinalitas & Keselarasan (20%)' },
+        { id: '1a', letter: 'a', indikator: 'Keaslian Karya & Penerapan Nyata', bobot: 10, criteria: [
+            'Gagasan murni hasil pemikiran mandiri tanpa plagiasi atau kemiripan identik dengan karya lain.',
+            'Telah diimplementasikan secara nyata dalam tugas utama di sekolah/wilayah kerja.',
+            'Substansi karya sangat relevan dengan tugas pokok dan fungsi (Tupoksi) peserta.',
+            'Bukti fisik penerapan (foto/video/dokumen pendukung) terlihat autentik dan meyakinkan.'
+        ] },
+        { id: '1b', letter: 'b', indikator: 'Kualitas Alur Naskah & Video', bobot: 10, criteria: [
+            'Alur cerita naskah dan video sinkron, logis, dan mudah dipahami oleh audiens umum.',
+            'Struktur penyajian mencakup: Situasi awal, Tantangan, Aksi yang dilakukan, dan Hasil akhir.',
+            'Teknik pengambilan video informatif dan estetis (pencahayaan, suara, dan sudut pandang).',
+            'Konten video menginspirasi dan memberikan kesan menyenangkan (tidak membosankan).'
+        ] },
+        
+        { type: 'header', text: '2. Resiliensi & Kolaborasi (30%)' },
+        { id: '2a', letter: 'a', indikator: 'Kegigihan Mengatasi Masalah', bobot: 20, criteria: [
+            'Menunjukkan keteguhan sikap dalam menghadapi kendala sarana, prasana, atau geografis.',
+            'Kreatif dalam memanfaatkan sumber daya lingkungan sekitar yang terbatas menjadi peluang.',
+            'Efektif dalam mengintegrasikan teknologi tepat guna untuk mempermudah solusi.',
+            'Menunjukkan optimisme dan semangat juang yang konsisten meski dalam tekanan tugas.'
+        ] },
+        { id: '2b', letter: 'b', indikator: 'Ketajaman Pemecahan Masalah', bobot: 5, criteria: [
+            'Analisis masalah didasarkan pada data lapangan yang akurat (bukan sekadar asumsi).',
+            'Solusi yang diambil tepat sasaran dan berdampak langsung pada akar permasalahan.',
+            'Implementasi solusi dilakukan secara sistematis dengan tahapan yang terukur.',
+            'Terdapat evaluasi dan refleksi diri atas tindakan yang telah diambil untuk perbaikan.'
+        ] },
+        { id: '2c', letter: 'c', indikator: 'Kolaborasi & Budaya Berbagi', bobot: 5, criteria: [
+            'Melibatkan pihak eksternal (orang tua, masyarakat, atau pakar) dalam penyelesaian masalah.',
+            'Mampu membangun kerja sama yang harmonis dengan rekan sejawat atau pimpinan.',
+            'Saling menghargai perbedaan pendapat dalam proses kerja kelompok/komunitas.',
+            'Menunjukkan semangat berbagi praktik baik melalui komunitas belajar atau media sosial.'
+        ] },
+        
+        { type: 'header', text: '3. Dedikasi & Pengorbanan (10%)' },
+        { id: '3', letter: 'a', indikator: 'Layanan Terbaik sebagai Panggilan Hidup', bobot: 10, criteria: [
+            'Rela mengorbankan waktu, tenaga, atau materi di luar batas kewajiban administratif.',
+            'Melakukan inovasi secara mandiri tanpa harus menunggu instruksi atau anggaran khusus.',
+            'Menjalankan tugas dengan ketulusan sebagai bentuk dedikasi/panggilan pengabdian.',
+            'Tetap memberikan layanan pendidikan berkualitas di tengah keterbatasan fasilitas/personel.'
+        ] },
+        
+        { type: 'header', text: '4. Kebaruan & Inovasi (5%)' },
+        { id: '4', letter: 'a', indikator: 'Ide Kreatif dalam Solusi', bobot: 5, criteria: [
+            'Menghasilkan cara/metode baru yang belum pernah diterapkan sebelumnya di lingkungan tersebut.',
+            'Inovasi bersifat praktis, mudah diaplikasikan, dan tidak membebani pengguna lain.',
+            'Memiliki potensi tinggi untuk diadaptasi/direplikasi oleh institusi lain dengan mudah.',
+            'Memaksimalkan kearifan lokal (local wisdom) sebagai bagian dari inovasi yang dibuat.'
+        ] },
+        
+        { type: 'header', text: '5. Program Prioritas Kemendikbudristek (10%)' },
+        { id: '5a', letter: 'a', indikator: 'Implementasi 7 Kebiasaan Anak Indonesia Hebat', bobot: 3, criteria: [
+            'Menerapkan minimal 3-7 kebiasaan (Berdoa, Bersyukur, Berpikir Kritis, dll) di sekolah.',
+            'Proses pembiasaan dilakukan secara konsisten dan menjadi budaya kelas/sekolah.',
+            'Terjadi perubahan perilaku siswa yang nyata (teramati) akibat implementasi tersebut.',
+            'Strategi penguatan karakter ini melibatkan guru lain dan lingkungan keluarga siswa.'
+        ] },
+        { id: '5b', letter: 'b', indikator: 'Pembelajaran Mendalam (Deeper Learning)', bobot: 4, criteria: [
+            'Mendorong siswa melakukan eksplorasi mendalam, refleksi, dan penalaran logis.',
+            'Menghubungkan konsep teoritis dengan fenomena dunia nyata yang relevan bagi siswa.',
+            'Memfasilitasi siswa untuk berpikir kritis, kreatif, serta mampu memecahkan masalah.',
+            'Siswa menunjukkan pemahaman bermakna yang bertahan lama (long-term memory).'
+        ] },
+        { id: '5c', letter: 'c', indikator: 'Literasi dan Numerasi Kontekstual', bobot: 3, criteria: [
+            'Mengintegrasikan kemampuan literasi (membaca/menulis) secara sistematis dalam konten.',
+            'Menghadirkan konsep numerasi (angka/logika) dalam konteks keseharian/mata pelajaran.',
+            'Menggunakan media atau metode kreatif untuk menstimulasi minat literasi & numerasi.',
+            'Menunjukkan bukti peningkatan keterampilan literasi/numerasi siswa (hasil karya/nilai).'
+        ] },
+        
+        { type: 'header', text: '6. Kebermanfaatan & Dampak (20%)' },
+        { id: '6a', letter: 'a', indikator: 'Dampak Kognisi (Pengetahuan)', bobot: 10, criteria: [
+            'Mampu meningkatkan wawasan dan pengetahuan sasaran (siswa/rekan sejawat).',
+            'Memperdalam tingkat pemahaman terhadap materi atau regulasi yang sedang diulas.',
+            'Memperkuat daya ingat sasaran melalui metode penyampaian yang ikonik/berkesan.',
+            'Membangkitkan daya tarik dan perhatian tinggi dari target audiens selama proses.'
+        ] },
+        { id: '6b', letter: 'b', indikator: 'Dampak Konasi (Tindakan)', bobot: 5, criteria: [
+            'Mendorong motivasi sasaran untuk meniru atau menerapkan praktik baik tersebut.',
+            'Aksi yang dicontohkan berpotensi kuat menjadi kebiasaan positif yang menetap.',
+            'Membantu sasaran menjadi lebih terlatih dalam melakukan keterampilan teknis tertentu.',
+            'Sasaran menunjukkan peningkatan kemahiran/skil secara progresif setelah intervensi.'
+        ] },
+        { id: '6c', letter: 'c', indikator: 'Keberlanjutan Dampak (Sustainability)', bobot: 5, criteria: [
+            'Memberikan manfaat nyata bagi peningkatan kualitas belajar siswa secara langsung.',
+            'Memberikan inspirasi positif bagi pengembangan profesional rekan sejawat.',
+            'Memberikan nilai tambah bagi citra dan mutu layanan institusi sekolah/wilayah.',
+            'Menciptakan ekosistem lingkungan belajar yang lebih sehat dan kondusif.'
+        ] },
+        
+        { type: 'header', text: '7. Literasi Digital & Estetika (5%)' },
+        { id: '7', letter: 'a', indikator: 'Pemanfaatan Teknologi Informasi', bobot: 5, criteria: [
+            'Kualitas editing video halus (transisi rapi, sinkronisasi audio-visual pas).',
+            'Visualisasi data melalui infografis atau elemen grafis mudah dibaca dan menarik.',
+            'Penggunaan animasi atau elemen visual tambahan memperkuat pesan utama konten.',
+            'Pengaturan teks (caption/subtitel) proporsional, komunikatif, dan bebas kesalahan tulis.'
+        ] }
+    ];
+
+    let currentUser = null;
+    window.dbNilai = []; 
+    let currentEditData = null;
+
+    window.onload = () => {
+        const loginEl = document.getElementById('login-kategori');
+        KATEGORI_LIST.forEach(k => loginEl.add(new Option(k, k)));
+        const rankEl = document.getElementById('rank-filter-kat');
+        KATEGORI_LIST.forEach(k => rankEl.add(new Option(k, k)));
+        lucide.createIcons();
+    };
+
+    function login(e, type) {
+        if(e) e.preventDefault();
+        const kat = document.getElementById('login-kategori').value;
+        const passJuri = document.getElementById('juri-password').value;
+        const passAdmin = document.getElementById('admin-password').value;
+
+        if(type === 'admin') {
+            if(passAdmin === 'admin2026') {
+                currentUser = { role: 'ADMIN', kategori: 'SEMUA KATEGORI' };
+                document.body.classList.add('is-admin');
+            } else return alert("Password Admin Salah!");
+        } else {
+            if(!kat) return alert("Pilih kategori!");
+            if(['juri1gtk', 'juri2gtk', 'juri3gtk'].includes(passJuri)) {
+                const map = {'juri1gtk':'JURI 1', 'juri2gtk':'JURI 2', 'juri3gtk':'JURI 3'};
+                currentUser = { role: map[passJuri], kategori: kat };
+                document.body.classList.remove('is-admin');
+            } else return alert("Password Juri Salah!");
+        }
+
+        document.getElementById('section-login').style.display = 'none';
+        document.getElementById('app-wrapper').style.display = 'block';
+        document.getElementById('role-display').textContent = currentUser.role;
+        document.getElementById('active-cat-pill').textContent = currentUser.kategori;
+        initParticipantsMenu();
+        switchSection('dashboard');
+    }
+
+    function initParticipantsMenu() {
+        const s = document.getElementById('pilih-peserta');
+        s.innerHTML = '<option value="">-- Pilih Peserta --</option>';
+        PESERTA.filter(p => currentUser.role === 'ADMIN' || p.kategori === currentUser.kategori)
+               .forEach(p => s.innerHTML += `<option value="${p.id}">${p.nama}</option>`);
+    }
+
+    window.refreshUI = function() {
+        if (!currentUser) return;
+        initDashboard();
+        initRanking();
+        if(currentUser?.role === 'ADMIN') initAdmin();
+        lucide.createIcons();
+    }
+
+    function switchSection(id) {
+        document.querySelectorAll('.app-section').forEach(s => s.style.display = 'none');
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const target = document.getElementById(`section-${id}`);
+        if(target) target.style.display = 'block';
+        
+        const navTarget = document.getElementById(`nav-${id}`);
+        if(navTarget) navTarget.classList.add('active');
+        
+        window.refreshUI();
+    }
+
+    function initDashboard() {
+        const filtered = PESERTA.filter(p => currentUser.role === 'ADMIN' || p.kategori === currentUser.kategori);
+        const body = document.getElementById('dash-table');
+        body.innerHTML = filtered.map(p => {
+            const scores = window.dbNilai.filter(n => n.pId == p.id);
+            const check = (j) => scores.find(n => n.juri === j) ? '<i data-lucide="check-circle" class="text-success"></i>' : '<i data-lucide="circle" class="opacity-25"></i>';
+            return `<tr>
+                <td><b>${p.nama}</b><br><small class="text-muted">${p.instansi}</small></td>
+                <td><div class="d-flex gap-1"><span class="badge bg-light text-dark border">Naskah</span><span class="badge bg-light text-dark border">Video</span></div></td>
+                <td class="text-center">${check('JURI 1')}</td><td class="text-center">${check('JURI 2')}</td><td class="text-center">${check('JURI 3')}</td>
+                <td class="text-end"><button class="btn btn-sm btn-primary px-3 rounded-pill" onclick="goNilai(${p.id})">Nilai</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function goNilai(id) {
+        document.getElementById('pilih-peserta').value = id;
+        switchSection('penilaian');
+        loadForm();
+    }
+
+    function loadForm() {
+        const id = document.getElementById('pilih-peserta').value;
+        if(!id) return document.getElementById('form-area').style.display='none';
+        currentEditData = window.dbNilai.find(n => n.pId == id && n.juri === currentUser.role);
+        document.getElementById('form-area').style.display='block';
+        
+        const formBody = document.getElementById('form-body');
+        formBody.innerHTML = '';
+        
+        RUBRIK_CONFIG.forEach(item => {
+            if (item.type === 'header') {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="4" class="py-2 px-4 group-header">${item.text}</td>`;
+                formBody.appendChild(tr);
+            } else {
+                formBody.innerHTML += renderRow(item, currentEditData?.scores?.[item.id]);
+            }
+        });
+        
+        calculate();
+    }
+
+    function renderRow(r, val = 0) {
+        return `<tr>
+            <td class="py-3 ps-4">
+                <div class="d-flex align-items-center"><span class="sub-letter">${r.letter}.</span><div class="fw-bold">${r.indikator}</div></div>
+                <ul class="criteria-list">${r.criteria.map((c, i) => `<li data-num="${i+1})">${c}</li>`).join('')}</ul>
+            </td>
+            <td class="text-center fw-bold">${r.bobot}%</td>
+            <td>
+                <select class="form-select score-in fw-bold" data-id="${r.id}" data-bobot="${r.bobot}" onchange="calculate()">
+                    <option value="0">Skor</option>${[1,2,3,4].map(v => `<option value="${v}" ${val==v?'selected':''}>${v}</option>`).join('')}
+                </select>
+            </td>
+            <td class="text-end fw-bold text-primary pe-4" id="val-${r.id}">0.00</td>
+        </tr>`;
+    }
+
+    function calculate() {
+        let total = 0;
+        document.querySelectorAll('.score-in').forEach(el => {
+            const s = parseInt(el.value);
+            const res = (s * parseFloat(el.dataset.bobot)) / 4;
+            if(document.getElementById(`val-${el.dataset.id}`)) document.getElementById(`val-${el.dataset.id}`).textContent = res.toFixed(2);
+            total += res;
+        });
+        document.getElementById('grand-total').textContent = total.toFixed(2);
+    }
+
+    async function saveNilai() {
+        if (!window.currentUserAuth) return alert("Koneksi Database Gagal. Coba muat ulang halaman.");
+        const id = document.getElementById('pilih-peserta').value;
+        const scores = {};
+        let empty = false;
+        document.querySelectorAll('.score-in').forEach(el => {
+            if(el.value == "0") empty = true;
+            scores[el.dataset.id] = parseInt(el.value);
+        });
+        if(empty) return alert("Harap lengkapi semua rincian skor indikator!");
+
+        document.getElementById('loading').style.display='flex';
+        const dId = `${id}_${currentUser.role.replace(/\s+/g, '')}`;
+        const docRef = window.fbImports.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'scores', dId);
+        
+        try {
+            await window.fbImports.setDoc(docRef, {
+                pId: parseInt(id), 
+                juri: currentUser.role, 
+                total: parseFloat(document.getElementById('grand-total').textContent), 
+                scores, 
+                time: new Date().toISOString(), 
+                userId: window.currentUserAuth.uid
+            });
+            document.getElementById('loading').style.display='none';
+            switchSection('dashboard');
+        } catch (error) {
+            console.error("Save error:", error);
+            alert("Gagal menyimpan ke cloud: " + error.message);
+            document.getElementById('loading').style.display='none';
+        }
+    }
+
+    function initRanking() {
+        const activeKat = currentUser.role === 'ADMIN' ? document.getElementById('rank-filter-kat').value : currentUser.kategori;
+        if(currentUser.role !== 'ADMIN') document.getElementById('rank-cat-badge').textContent = activeKat;
+
+        const list = PESERTA.filter(p => p.kategori === activeKat).map(p => {
+            const sc = window.dbNilai.filter(n => n.pId == p.id); 
+            const j1 = sc.find(n => n.juri === 'JURI 1')?.total || 0;
+            const j2 = sc.find(n => n.juri === 'JURI 2')?.total || 0;
+            const j3 = sc.find(n => n.juri === 'JURI 3')?.total || 0;
+            const vals = [j1, j2, j3].filter(v => v > 0);
+            return { nama: p.nama, instansi: p.instansi, j1, j2, j3, avg: vals.length > 0 ? vals.reduce((a,b)=>a+b)/vals.length : 0 };
+        }).filter(x => x.avg > 0).sort((a,b) => b.avg - a.avg).slice(0, 10);
+
+        const body = document.getElementById('rank-table');
+        if(list.length === 0) body.innerHTML = `<tr><td colspan="6" class="text-center p-5">Belum ada data nilai tersinkronisasi.</td></tr>`;
+        else body.innerHTML = list.map((r, i) => `
+            <tr><td class="ps-4"><div class="rank-badge ${i<3?'rank-'+(i+1):'bg-light'}">${i+1}</div></td>
+                <td><b>${r.nama}</b><br><small>${r.instansi}</small></td>
+                <td class="text-center">${r.j1.toFixed(2)}</td><td class="text-center">${r.j2.toFixed(2)}</td><td class="text-center">${r.j3.toFixed(2)}</td>
+                <td class="text-center fw-bold text-primary">${r.avg.toFixed(2)}</td></tr>`).join('');
+    }
+
+    function initAdmin() {
+        const body = document.getElementById('admin-table');
+        body.innerHTML = window.dbNilai.map(n => {
+            const p = PESERTA.find(x => x.id == n.pId);
+            return `<tr><td><small>${p?.kategori}</small></td><td><b>${p?.nama}</b></td><td>${n.juri}</td><td class="fw-bold">${n.total.toFixed(2)}</td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="adminDel('${n.docId}')">Hapus Permanen</button></td></tr>`;
+        }).join('');
+    }
+
+    async function adminDel(id) {
+        if(confirm("Apakah Anda yakin ingin menghapus data ini dari database cloud?")) {
+            await window.fbImports.deleteDoc(window.fbImports.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'scores', id));
+        }
+    }
+
+    function exportRankingPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const activeKat = currentUser.role === 'ADMIN' ? document.getElementById('rank-filter-kat').value : currentUser.kategori;
+        doc.text(`Hasil Penilaian GTK Dedikatif 2026 - ${activeKat}`, 14, 15);
+        doc.autoTable({ html: '#table-ranking-content', startY: 20 });
+        doc.save(`Peringkat_${activeKat.replace(/\s+/g, '_')}.pdf`);
+    }
+
+    function exportRankingExcel() {
+        const ws = XLSX.utils.table_to_sheet(document.getElementById('table-ranking-content'));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ranking");
+        XLSX.writeFile(wb, "Laporan_Peringkat_GTK_2026.xlsx");
+    }
+
+    function exportMonitoringExcel() {
+        const ws = XLSX.utils.json_to_sheet(window.dbNilai);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Monitoring");
+        XLSX.writeFile(wb, "Data_Monitoring_Lengkap.xlsx");
+    }
+
+    function toggleTheme() {
+        const dark = document.getElementById('themeSwitch').checked;
+        document.getElementById('main-body').setAttribute('data-theme', dark ? 'dark' : 'light');
+    }
+
+    async function logout() {
+        if(confirm("Apakah Anda yakin ingin keluar?")) {
+            document.getElementById('loading').style.display='flex';
+            try {
+                // Hapus state memori
+                currentUser = null;
+                document.body.classList.remove('is-admin');
+                
+                // Sign out Firebase jika memungkinkan
+                if(window.fbImports && window.fbImports.signOut) {
+                    await window.fbImports.signOut(window.auth);
+                }
+
+                // Reset Tampilan manual tanpa reload paksa agar transisi halus
+                document.getElementById('app-wrapper').style.display = 'none';
+                document.getElementById('section-login').style.display = 'flex';
+                
+                // Reset form input
+                document.getElementById('juri-login-form').reset();
+                document.getElementById('admin-login-form').reset();
+                document.getElementById('login-kategori').value = "";
+                
+                // Segarkan halaman untuk memastikan semua listener mati
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+
+            } catch (err) {
+                console.error("Logout error:", err);
+                location.reload();
+            }
+        }
+    }
+</script>
+</body>
+</html>
